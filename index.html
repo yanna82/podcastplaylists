@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Podcast Playlists</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Playlists">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#b4235a">
+<style>
+/* Layout idea: two panes (find / playlists) above a fixed player bar. */
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #e3e1db;
+  --accent: #b4235a;
+  --accent-ink: #ffffff;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141416; --surface: #1e1e21; --ink: #f2f2f3; --muted: #9a9aa2;
+    --line: #2c2c31; --accent: #ff5c97; --accent-ink: #1a0b12; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.4; display: flex; flex-direction: column;
+}
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; }
+h2 { font-size: 18px; }
+button, input, select {
+  font: inherit; color: inherit;
+}
+button {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="text"], input[type="search"], select {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0;
+}
+header.top {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+header.top .spacer { flex: 1; }
+nav.tabs { display: flex; gap: 6px; }
+nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+main { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.row.wrap-row { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+li.item {
+  display: flex; gap: 12px; align-items: center; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0;
+}
+li.item.playing { border-color: var(--accent); }
+li.item img, .art {
+  width: 52px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; background: var(--line);
+}
+.title { font-weight: 600; }
+.status { padding: 24px 0; text-align: center; color: var(--muted); }
+.err { color: #c0392b; }
+.target { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+footer.player {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line); background: var(--surface); padding: 10px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+footer.player .controls { display: flex; align-items: center; gap: 8px; }
+footer.player input[type="range"] { width: 100%; accent-color: var(--accent); }
+.times { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.now { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.now .art { width: 40px; height: 40px; }
+.hidden { display: none !important; }
+.btn-row { display: flex; gap: 4px; flex: none; }
+.icon { min-width: 34px; text-align: center; padding: 6px 8px; }
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); max-width: 480px; width: calc(100% - 32px); }
+dialog textarea { width: 100%; min-height: 140px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: monospace; font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { button { transition: border-color .15s; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Podcast Playlists</h1>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button id="tab-find" role="tab" aria-selected="true">Find episodes</button>
+    <button id="tab-lists" role="tab" aria-selected="false">Playlists <span class="pill" id="plCount">0</span></button>
+  </nav>
+  <span class="spacer"></span>
+  <button class="ghost small" id="backupBtn">Backup / restore</button>
+</header>
+
+<main>
+  <div class="wrap" id="viewFind">
+    <form class="row" id="searchForm">
+      <input type="search" id="q" class="grow" placeholder="Search for a podcast" aria-label="Search for a podcast" autocomplete="off">
+      <button class="primary" type="submit">Search</button>
+    </form>
+    <div class="target small">
+      <label for="targetSel" class="muted">Add episodes to</label>
+      <select id="targetSel"></select>
+      <button id="newPlBtn" type="button">New playlist</button>
+    </div>
+    <div id="findOut"><div class="status">Search for a show, open it, then tap + on any episode, old or new.</div></div>
+  </div>
+
+  <div class="wrap hidden" id="viewLists">
+    <div class="row wrap-row">
+      <select id="plSel" aria-label="Playlist" class="grow"></select>
+      <button id="playAllBtn" class="primary">Play</button>
+      <button id="renameBtn">Rename</button>
+      <button id="delPlBtn">Delete</button>
+    </div>
+    <div id="plOut"></div>
+  </div>
+</main>
+
+<footer class="player">
+  <div class="now">
+    <div class="art" id="nowArt"></div>
+    <div class="grow">
+      <div class="title trunc" id="nowTitle">Nothing playing</div>
+      <div class="small muted trunc" id="nowShow">Pick a playlist and press Play</div>
+    </div>
+  </div>
+  <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+  <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+  <div class="controls">
+    <button class="icon" id="prevBtn" aria-label="Previous episode">&#9198;</button>
+    <button class="icon" id="back15" aria-label="Back 15 seconds">-15</button>
+    <button class="icon primary" id="playBtn" aria-label="Play or pause">&#9654;</button>
+    <button class="icon" id="fwd30" aria-label="Forward 30 seconds">+30</button>
+    <button class="icon" id="nextBtn" aria-label="Next episode">&#9197;</button>
+    <span class="grow"></span>
+    <select id="speed" aria-label="Playback speed">
+      <option value="0.8">0.8x</option><option value="1" selected>1x</option>
+      <option value="1.25">1.25x</option><option value="1.5">1.5x</option>
+      <option value="1.75">1.75x</option><option value="2">2x</option>
+    </select>
+  </div>
+  <audio id="audio" preload="none"></audio>
+</footer>
+
+<dialog id="backupDlg">
+  <form method="dialog" class="wrap" style="gap:10px">
+    <h2>Backup / restore</h2>
+    <p class="small muted" style="margin:0">Copy this text somewhere safe. To restore, paste a backup below and press Restore.</p>
+    <textarea id="backupTxt" aria-label="Backup data"></textarea>
+    <div class="row">
+      <button type="button" id="restoreBtn" class="primary">Restore</button>
+      <button type="button" id="copyBtn">Copy</button>
+      <span class="grow"></span>
+      <button value="close">Close</button>
+    </div>
+    <div class="small" id="backupMsg"></div>
+  </form>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const KEY = "podcast-playlists-v1";
+
+  // ---------- storage ----------
+  let state = { playlists: [], target: null, lastPlaying: null };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) state = Object.assign(state, JSON.parse(raw));
+  } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  const uid = () => Math.random().toString(36).slice(2, 10);
+
+  // ---------- helpers ----------
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    sec = Math.floor(sec);
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+  }
+  function fmtDate(d) {
+    try { return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); } catch (e) { return ""; }
+  }
+  const getPl = (id) => state.playlists.find((p) => p.id === id);
+
+  // ---------- tabs ----------
+  function showTab(name) {
+    const find = name === "find";
+    $("viewFind").classList.toggle("hidden", !find);
+    $("viewLists").classList.toggle("hidden", find);
+    $("tab-find").setAttribute("aria-selected", String(find));
+    $("tab-lists").setAttribute("aria-selected", String(!find));
+    if (!find) renderLists();
+  }
+  $("tab-find").onclick = () => showTab("find");
+  $("tab-lists").onclick = () => showTab("lists");
+
+  // ---------- playlist selectors ----------
+  function renderSelectors() {
+    $("plCount").textContent = state.playlists.length;
+    const opts = state.playlists.map((p) => `<option value="${p.id}">${esc(p.name)} (${p.items.length})</option>`).join("");
+    $("targetSel").innerHTML = opts || '<option value="">No playlists yet</option>';
+    if (!getPl(state.target) && state.playlists[0]) state.target = state.playlists[0].id;
+    if (state.target) $("targetSel").value = state.target;
+    const cur = $("plSel").value;
+    $("plSel").innerHTML = opts || '<option value="">No playlists yet</option>';
+    if (getPl(cur)) $("plSel").value = cur; else if (state.playlists[0]) $("plSel").value = state.playlists[0].id;
+  }
+  $("targetSel").onchange = () => { state.target = $("targetSel").value; save(); };
+  $("plSel").onchange = renderLists;
+
+  function newPlaylist(name) {
+    name = (name || "").trim();
+    if (!name) return null;
+    const pl = { id: uid(), name, items: [] };
+    state.playlists.push(pl);
+    state.target = pl.id;
+    save(); renderSelectors();
+    return pl;
+  }
+  $("newPlBtn").onclick = () => {
+    const n = window.prompt ? safePrompt("Name for the new playlist") : null;
+    if (n) newPlaylist(n);
+  };
+  function safePrompt(msg, def) { try { return window.prompt(msg, def || ""); } catch (e) { return null; } }
+
+  $("renameBtn").onclick = () => {
+    const pl = getPl($("plSel").value); if (!pl) return;
+    const n = safePrompt("Rename playlist", pl.name);
+    if (n && n.trim()) { pl.name = n.trim(); save(); renderSelectors(); renderLists(); }
+  };
+  $("delPlBtn").onclick = () => {
+    const pl = getPl($("plSel").value); if (!pl) return;
+    let ok = true; try { ok = window.confirm('Delete "' + pl.name + '"?'); } catch (e) {}
+    if (!ok) return;
+    state.playlists = state.playlists.filter((p) => p.id !== pl.id);
+    if (playing && playing.plId === pl.id) { audio.pause(); playing = null; updateNow(); }
+    save(); renderSelectors(); renderLists();
+  };
+
+  // ---------- search ----------
+  const API = "https://itunes.apple.com";
+  async function api(path) {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error("Apple lookup failed (" + r.status + ")");
+    return r.json();
+  }
+
+  $("searchForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const term = $("q").value.trim();
+    if (!term) return;
+    $("findOut").innerHTML = '<div class="status">Searching...</div>';
+    try {
+      const data = await api("/search?media=podcast&entity=podcast&limit=25&term=" + encodeURIComponent(term));
+      renderShows(data.results || []);
+    } catch (err) {
+      $("findOut").innerHTML = '<div class="status err">' + esc(err.message) + ". Check your connection and try again.</div>";
+    }
+  };
+
+  function renderShows(shows) {
+    if (!shows.length) { $("findOut").innerHTML = '<div class="status">No shows found. Try another search.</div>'; return; }
+    $("findOut").innerHTML = '<ul class="list">' + shows.map((s) => `
+      <li class="item">
+        <img src="${esc(s.artworkUrl100 || s.artworkUrl60 || "")}" alt="" loading="lazy">
+        <div class="grow">
+          <div class="title trunc">${esc(s.collectionName)}</div>
+          <div class="small muted trunc">${esc(s.artistName)}${s.trackCount ? " · " + s.trackCount + " episodes" : ""}</div>
+        </div>
+        <button data-show="${s.collectionId}" data-name="${esc(s.collectionName)}">Episodes</button>
+      </li>`).join("") + "</ul>";
+    $("findOut").querySelectorAll("button[data-show]").forEach((b) => {
+      b.onclick = () => openShow(b.dataset.show, b.dataset.name);
+    });
+  }
+
+  let currentEps = [], epsNewestFirst = true, epsFilter = "", epsShowName = "";
+  async function openShow(id, name) {
+    epsShowName = name; epsFilter = ""; epsNewestFirst = true;
+    $("findOut").innerHTML = '<div class="status">Loading episodes...</div>';
+    try {
+      const data = await api("/lookup?id=" + encodeURIComponent(id) + "&media=podcast&entity=podcastEpisode&limit=300");
+      currentEps = (data.results || []).filter((r) => r.wrapperType === "podcastEpisode" || r.kind === "podcast-episode")
+        .map((r) => ({
+          id: "ep" + (r.trackId || uid()),
+          title: r.trackName || "Untitled",
+          show: r.collectionName || name,
+          url: r.episodeUrl || r.previewUrl || "",
+          art: r.artworkUrl160 || r.artworkUrl600 || "",
+          dur: r.trackTimeMillis ? r.trackTimeMillis / 1000 : 0,
+          date: r.releaseDate || ""
+        })).filter((e) => e.url);
+      renderEpisodes();
+    } catch (err) {
+      $("findOut").innerHTML = '<div class="status err">' + esc(err.message) + '.</div>';
+    }
+  }
+
+  function renderEpisodes() {
+    let eps = currentEps.slice().sort((a, b) => (new Date(a.date) - new Date(b.date)) * (epsNewestFirst ? -1 : 1));
+    if (epsFilter) { const f = epsFilter.toLowerCase(); eps = eps.filter((e) => e.title.toLowerCase().includes(f)); }
+    const head = `
+      <div class="row wrap-row">
+        <button id="backShows">&larr; Results</button>
+        <h2 class="grow trunc">${esc(epsShowName)}</h2>
+      </div>
+      <div class="row wrap-row" style="margin:10px 0">
+        <input type="search" id="epFilter" class="grow" placeholder="Filter episodes" aria-label="Filter episodes" value="${esc(epsFilter)}">
+        <button id="sortBtn">${epsNewestFirst ? "Newest first" : "Oldest first"}</button>
+      </div>
+      <div class="small muted" style="margin-bottom:8px">${eps.length} episode${eps.length === 1 ? "" : "s"} available from the feed Apple lists.</div>`;
+    const list = eps.length ? '<ul class="list">' + eps.map((e) => `
+      <li class="item">
+        <div class="grow">
+          <div class="title">${esc(e.title)}</div>
+          <div class="small muted">${fmtDate(e.date)}${e.dur ? " · " + fmtTime(e.dur) : ""}</div>
+        </div>
+        <button class="icon primary" data-add="${e.id}" aria-label="Add to playlist">+</button>
+      </li>`).join("") + "</ul>" : '<div class="status">No episodes match.</div>';
+    $("findOut").innerHTML = head + list;
+    $("backShows").onclick = () => $("searchForm").requestSubmit();
+    $("sortBtn").onclick = () => { epsNewestFirst = !epsNewestFirst; renderEpisodes(); };
+    $("epFilter").oninput = (ev) => {
+      epsFilter = ev.target.value;
+      const pos = ev.target.selectionStart;
+      renderEpisodes();
+      const f = $("epFilter"); f.focus(); f.setSelectionRange(pos, pos);
+    };
+    $("findOut").querySelectorAll("button[data-add]").forEach((b) => {
+      b.onclick = () => {
+        const ep = currentEps.find((x) => x.id === b.dataset.add);
+        if (ep) addToTarget(ep, b);
+      };
+    });
+  }
+
+  function addToTarget(ep, btn) {
+    let pl = getPl(state.target);
+    if (!pl) pl = newPlaylist("My playlist");
+    if (pl.items.some((i) => i.id === ep.id)) { flash(btn, "In list"); return; }
+    pl.items.push(Object.assign({}, ep));
+    save(); renderSelectors();
+    flash(btn, "Added");
+  }
+  function flash(btn, txt) {
+    const old = btn.innerHTML;
+    btn.innerHTML = txt; btn.classList.remove("icon");
+    setTimeout(() => { btn.innerHTML = old; btn.classList.add("icon"); }, 900);
+  }
+
+  // ---------- playlists view ----------
+  function renderLists() {
+    const pl = getPl($("plSel").value);
+    if (!pl) {
+      $("plOut").innerHTML = '<div class="status">No playlists yet. Search for a show on the first tab and add episodes with +.</div>';
+      return;
+    }
+    if (!pl.items.length) {
+      $("plOut").innerHTML = '<div class="status">This playlist is empty.</div>';
+      return;
+    }
+    const total = pl.items.reduce((a, i) => a + (i.dur || 0), 0);
+    $("plOut").innerHTML = `<div class="small muted" style="margin-bottom:8px">${pl.items.length} episodes${total ? " · " + fmtTime(total) : ""}</div>
+      <ul class="list">` + pl.items.map((e, i) => {
+        const on = playing && playing.plId === pl.id && playing.idx === i;
+        return `<li class="item${on ? " playing" : ""}">
+          <img src="${esc(e.art)}" alt="" loading="lazy">
+          <div class="grow">
+            <div class="title trunc">${esc(e.title)}</div>
+            <div class="small muted trunc">${esc(e.show)}${e.dur ? " · " + fmtTime(e.dur) : ""}</div>
+          </div>
+          <div class="btn-row">
+            <button class="icon" data-play="${i}" aria-label="Play">&#9654;</button>
+            <button class="icon" data-up="${i}" aria-label="Move up">&uarr;</button>
+            <button class="icon" data-down="${i}" aria-label="Move down">&darr;</button>
+            <button class="icon" data-del="${i}" aria-label="Remove">&times;</button>
+          </div>
+        </li>`;
+      }).join("") + "</ul>";
+    const q = (sel, fn) => $("plOut").querySelectorAll(sel).forEach((b) => (b.onclick = () => fn(+b.dataset[sel.slice(12, -1)])));
+    q("button[data-play]", (i) => playIndex(pl.id, i));
+    q("button[data-up]", (i) => move(pl, i, -1));
+    q("button[data-down]", (i) => move(pl, i, 1));
+    q("button[data-del]", (i) => remove(pl, i));
+  }
+  function move(pl, i, d) {
+    const j = i + d;
+    if (j < 0 || j >= pl.items.length) return;
+    const [it] = pl.items.splice(i, 1);
+    pl.items.splice(j, 0, it);
+    if (playing && playing.plId === pl.id) {
+      if (playing.idx === i) playing.idx = j; else if (playing.idx === j) playing.idx = i;
+    }
+    save(); renderLists();
+  }
+  function remove(pl, i) {
+    pl.items.splice(i, 1);
+    if (playing && playing.plId === pl.id) {
+      if (playing.idx === i) { audio.pause(); playing = null; updateNow(); }
+      else if (playing.idx > i) playing.idx--;
+    }
+    save(); renderSelectors(); renderLists();
+  }
+  $("playAllBtn").onclick = () => {
+    const pl = getPl($("plSel").value);
+    if (pl && pl.items.length) playIndex(pl.id, 0);
+  };
+
+  // ---------- player ----------
+  const audio = $("audio");
+  let playing = null; // { plId, idx }
+  let seeking = false;
+
+  function playIndex(plId, idx) {
+    const pl = getPl(plId);
+    if (!pl || !pl.items[idx]) return;
+    playing = { plId, idx };
+    const ep = pl.items[idx];
+    audio.src = ep.url;
+    audio.playbackRate = parseFloat($("speed").value);
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => {});
+    updateNow(); renderLists();
+  }
+  function current() {
+    if (!playing) return null;
+    const pl = getPl(playing.plId);
+    return pl ? pl.items[playing.idx] : null;
+  }
+  function updateNow() {
+    const ep = current();
+    $("nowTitle").textContent = ep ? ep.title : "Nothing playing";
+    $("nowShow").textContent = ep ? ep.show : "Pick a playlist and press Play";
+    $("nowArt").innerHTML = ep && ep.art ? `<img src="${esc(ep.art)}" alt="" style="width:100%;height:100%;border-radius:8px;object-fit:cover">` : "";
+    if ("mediaSession" in navigator && ep) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: ep.title, artist: ep.show,
+          artwork: ep.art ? [{ src: ep.art, sizes: "160x160" }] : []
+        });
+      } catch (e) {}
+    }
+  }
+  function step(d) {
+    if (!playing) return;
+    const pl = getPl(playing.plId); if (!pl) return;
+    const n = playing.idx + d;
+    if (n >= 0 && n < pl.items.length) playIndex(pl.id, n);
+    else if (d > 0) { audio.pause(); }
+  }
+  $("playBtn").onclick = () => {
+    if (!playing) {
+      const pl = getPl($("plSel").value) || state.playlists[0];
+      if (pl && pl.items.length) playIndex(pl.id, 0);
+      return;
+    }
+    if (audio.paused) { const p = audio.play(); if (p && p.catch) p.catch(() => {}); } else audio.pause();
+  };
+  $("prevBtn").onclick = () => { if (audio.currentTime > 5) audio.currentTime = 0; else step(-1); };
+  $("nextBtn").onclick = () => step(1);
+  $("back15").onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 15); };
+  $("fwd30").onclick = () => { audio.currentTime = Math.min(audio.duration || 1e9, audio.currentTime + 30); };
+  $("speed").onchange = () => { audio.playbackRate = parseFloat($("speed").value); };
+  audio.addEventListener("play", () => { $("playBtn").innerHTML = "&#10074;&#10074;"; });
+  audio.addEventListener("pause", () => { $("playBtn").innerHTML = "&#9654;"; });
+  audio.addEventListener("ended", () => step(1));
+  audio.addEventListener("error", () => { if (playing) $("nowShow").textContent = "Could not load this episode. Skipping may help."; });
+  audio.addEventListener("timeupdate", () => {
+    $("tCur").textContent = fmtTime(audio.currentTime);
+    $("tDur").textContent = fmtTime(audio.duration);
+    if (!seeking && audio.duration) $("seek").value = Math.round((audio.currentTime / audio.duration) * 1000);
+  });
+  $("seek").addEventListener("input", () => { seeking = true; });
+  $("seek").addEventListener("change", () => {
+    if (audio.duration) audio.currentTime = (+$("seek").value / 1000) * audio.duration;
+    seeking = false;
+  });
+  if ("mediaSession" in navigator) {
+    const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} };
+    set("play", () => audio.play()); set("pause", () => audio.pause());
+    set("previoustrack", () => step(-1)); set("nexttrack", () => step(1));
+    set("seekbackward", () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+    set("seekforward", () => { audio.currentTime += 30; });
+  }
+
+  // ---------- backup ----------
+  const dlg = $("backupDlg");
+  $("backupBtn").onclick = () => {
+    $("backupTxt").value = JSON.stringify({ playlists: state.playlists }, null, 1);
+    $("backupMsg").textContent = "";
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  };
+  $("copyBtn").onclick = async () => {
+    try { await navigator.clipboard.writeText($("backupTxt").value); $("backupMsg").textContent = "Copied."; }
+    catch (e) { $("backupTxt").select(); $("backupMsg").textContent = "Select all and copy by hand."; }
+  };
+  $("restoreBtn").onclick = () => {
+    try {
+      const d = JSON.parse($("backupTxt").value);
+      if (!d || !Array.isArray(d.playlists)) throw new Error("bad");
+      state.playlists = d.playlists.filter((p) => p && p.id && p.name && Array.isArray(p.items));
+      state.target = state.playlists[0] ? state.playlists[0].id : null;
+      save(); renderSelectors(); renderLists();
+      $("backupMsg").textContent = "Restored " + state.playlists.length + " playlists.";
+    } catch (e) { $("backupMsg").textContent = "That text is not a valid backup."; }
+  };
+
+  // ---------- init ----------
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  renderSelectors();
+  renderLists();
+})();
+</script>
+</body>
+</html>
