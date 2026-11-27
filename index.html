@@ -83,6 +83,7 @@ li.item img, .art {
 .status { padding: 24px 0; text-align: center; color: var(--muted); }
 .err { color: #c0392b; }
 .target { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill.added { color: var(--accent); border-color: var(--accent); margin-left: 6px; }
 .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
 footer.player {
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
@@ -232,8 +233,9 @@ dialog textarea { width: 100%; min-height: 140px; background: var(--bg); color: 
     const cur = $("plSel").value;
     $("plSel").innerHTML = opts || '<option value="">No playlists yet</option>';
     if (getPl(cur)) $("plSel").value = cur; else if (state.playlists[0]) $("plSel").value = state.playlists[0].id;
+    refreshBadges();
   }
-  $("targetSel").onchange = () => { state.target = $("targetSel").value; save(); };
+  $("targetSel").onchange = () => { state.target = $("targetSel").value; save(); refreshBadges(); };
   $("plSel").onchange = renderLists;
 
   function newPlaylist(name) {
@@ -341,7 +343,7 @@ dialog textarea { width: 100%; min-height: 140px; background: var(--bg); color: 
       <li class="item">
         <div class="grow">
           <div class="title">${esc(e.title)}</div>
-          <div class="small muted">${fmtDate(e.date)}${e.dur ? " · " + fmtTime(e.dur) : ""}</div>
+          <div class="small muted">${fmtDate(e.date)}${e.dur ? " · " + fmtTime(e.dur) : ""}<span class="pill added hidden" data-badge="${e.id}"></span></div>
         </div>
         <button class="icon primary" data-add="${e.id}" aria-label="Add to playlist">+</button>
       </li>`).join("") + "</ul>" : '<div class="status">No episodes match.</div>';
@@ -357,23 +359,37 @@ dialog textarea { width: 100%; min-height: 140px; background: var(--bg); color: 
     $("findOut").querySelectorAll("button[data-add]").forEach((b) => {
       b.onclick = () => {
         const ep = currentEps.find((x) => x.id === b.dataset.add);
-        if (ep) addToTarget(ep, b);
+        if (ep) addToTarget(ep);
       };
+    });
+    refreshBadges();
+  }
+
+  // Shows which playlists hold each episode, and a check on + when it is in the chosen playlist.
+  function refreshBadges() {
+    const out = $("findOut");
+    if (!out) return;
+    out.querySelectorAll("[data-badge]").forEach((el) => {
+      const names = state.playlists.filter((p) => p.items.some((i) => i.id === el.dataset.badge)).map((p) => p.name);
+      el.classList.toggle("hidden", names.length === 0);
+      el.textContent = names.length === 1 ? "In 1 playlist" : "In " + names.length + " playlists";
+      el.title = names.join(", ");
+    });
+    const tgt = getPl(state.target);
+    out.querySelectorAll("button[data-add]").forEach((b) => {
+      const inTarget = !!(tgt && tgt.items.some((i) => i.id === b.dataset.add));
+      b.innerHTML = inTarget ? "&#10003;" : "+";
+      b.setAttribute("aria-label", inTarget ? "Already in " + tgt.name : "Add to playlist");
+      b.title = inTarget ? "Already in " + tgt.name : "";
     });
   }
 
-  function addToTarget(ep, btn) {
+  function addToTarget(ep) {
     let pl = getPl(state.target);
     if (!pl) pl = newPlaylist("My playlist");
-    if (pl.items.some((i) => i.id === ep.id)) { flash(btn, "In list"); return; }
+    if (pl.items.some((i) => i.id === ep.id)) return;
     pl.items.push(Object.assign({}, ep));
     save(); renderSelectors();
-    flash(btn, "Added");
-  }
-  function flash(btn, txt) {
-    const old = btn.innerHTML;
-    btn.innerHTML = txt; btn.classList.remove("icon");
-    setTimeout(() => { btn.innerHTML = old; btn.classList.add("icon"); }, 900);
   }
 
   // ---------- playlists view ----------
